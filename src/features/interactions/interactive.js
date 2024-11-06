@@ -1,30 +1,53 @@
-export default class Interactive {
+export class InteractiveElements {
     constructor() {
-        this.init();
+        this.setupEventListeners();
+        this.setupScrollTriggers();
     }
 
-    init() {
-        this.setupHoverEffects();
-        this.setupClickEffects();
+    setupEventListeners() {
+        // Setup interactive elements
+        const ctaButton = document.querySelector('.cta-button');
+        const generateButton = document.querySelector('.generate-button');
+        const playDemo = document.querySelector('#play-demo');
+        const compareButton = document.querySelector('#compare');
+
+        ctaButton?.addEventListener('click', this.handleCTAClick);
+        generateButton?.addEventListener('click', this.handleGenerateClick);
+        playDemo?.addEventListener('click', this.handlePlayDemo);
+        compareButton?.addEventListener('click', this.handleCompare);
     }
 
-    setupHoverEffects() {
-        document.querySelectorAll('.interactive').forEach(element => {
-            element.addEventListener('mouseenter', () => {
-                element.classList.add('hovered');
-            });
-            element.addEventListener('mouseleave', () => {
-                element.classList.remove('hovered');
-            });
-        });
+    setupScrollTriggers() {
+        // Add scroll-based animations and interactions
+        const sections = document.querySelectorAll('section');
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('active');
+                    }
+                });
+            },
+            { threshold: 0.2 }
+        );
+
+        sections.forEach(section => observer.observe(section));
     }
 
-    setupClickEffects() {
-        document.querySelectorAll('.clickable').forEach(element => {
-            element.addEventListener('click', () => {
-                element.classList.add('clicked');
-                setTimeout(() => element.classList.remove('clicked'), 200);
-            });
-        });
+    // Event handlers
+    handleCTAClick = () => {
+        // Implement CTA button click logic
+    }
+
+    handleGenerateClick = () => {
+        // Implement artwork generation logic
+    }
+
+    handlePlayDemo = () => {
+        // Implement demo playback logic
+    }
+
+    handleCompare = () => {
+        // Implement comparison logic
     }
 } 

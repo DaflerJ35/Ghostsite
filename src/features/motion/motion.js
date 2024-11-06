@@ -1,11 +1,18 @@
-export default class Motion {
+export class MotionControls {
     constructor() {
-        this.init();
+        this.setupMotionControls();
+        this.setupDeviceOrientation();
     }
 
-    init() {
+    setupMotionControls() {
         if (window.DeviceMotionEvent) {
             window.addEventListener('devicemotion', this.handleMotion.bind(this));
+        }
+    }
+
+    setupDeviceOrientation() {
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', this.handleOrientation.bind(this));
         }
     }
 
@@ -14,7 +21,16 @@ export default class Motion {
         const y = event.accelerationIncludingGravity.y;
 
         document.querySelectorAll('.motion-sensitive').forEach(element => {
-            element.style.transform = `translate(${x * 10}px, ${y * 10}px)`;
+            element.style.transform = `translate(${x * 5}px, ${y * 5}px)`;
+        });
+    }
+
+    handleOrientation(event) {
+        const beta = event.beta; // X-axis rotation
+        const gamma = event.gamma; // Y-axis rotation
+
+        document.querySelectorAll('.orientation-sensitive').forEach(element => {
+            element.style.transform = `rotateX(${beta}deg) rotateY(${gamma}deg)`;
         });
     }
 } 

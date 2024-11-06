@@ -1,107 +1,162 @@
-class WebGLEnhancements {
+import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
+import { GlitchPass } from 'three/examples/jsm/postprocessing/GlitchPass';
+
+export class WebGLEnhancements {
     constructor() {
         this.init();
+        this.addPostProcessing();
+        this.animate();
     }
 
     init() {
-        this.setupWebGLScene();
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance"
+        });
+
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.5;
+
+        document.getElementById('webgl-background').appendChild(this.renderer.domElement);
+
+        this.setupLights();
+        this.setupEnvironment();
+        this.setupParticles();
+        
+        window.addEventListener('resize', this.onWindowResize.bind(this));
     }
 
-    setupWebGLScene() {
-        const canvas = document.querySelector("#webgl-canvas");
-        const gl = canvas.getContext("webgl");
+    setupLights() {
+        const ambientLight = new THREE.AmbientLight(0x111111);
+        this.scene.add(ambientLight);
 
-        if (!gl) {
-            console.error("WebGL not supported");
-            return;
+        const spotLight = new THREE.SpotLight(0x00ff99, 1);
+        spotLight.position.set(0, 10, 10);
+        spotLight.angle = Math.PI / 4;
+        spotLight.penumbra = 0.1;
+        spotLight.decay = 2;
+        spotLight.distance = 200;
+
+        spotLight.castShadow = true;
+        spotLight.shadow.mapSize.width = 512;
+        spotLight.shadow.mapSize.height = 512;
+        spotLight.shadow.camera.near = 10;
+        spotLight.shadow.camera.far = 200;
+        spotLight.shadow.focus = 1;
+        this.scene.add(spotLight);
+    }
+
+    setupEnvironment() {
+        // Create a dynamic environment with floating objects
+        const geometry = new THREE.IcosahedronGeometry(1, 0);
+        const material = new THREE.MeshPhysicalMaterial({
+            color: 0x00ff99,
+            metalness: 0.9,
+            roughness: 0.1,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+
+        for (let i = 0; i < 50; i++) {
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(
+                Math.random() * 40 - 20,
+                Math.random() * 40 - 20,
+                Math.random() * 40 - 20
+            );
+            mesh.scale.setScalar(Math.random() * 0.5 + 0.5);
+            this.scene.add(mesh);
+        }
+    }
+
+    setupParticles() {
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particleCount = 5000;
+
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount * 3; i += 3) {
+            positions[i] = (Math.random() - 0.5) * 100;
+            positions[i + 1] = (Math.random() - 0.5) * 100;
+            positions[i + 2] = (Math.random() - 0.5) * 100;
+
+            colors[i] = Math.random();
+            colors[i + 1] = Math.random();
+            colors[i + 2] = Math.random();
         }
 
-        // Set clear color to black, fully opaque
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        // Clear the color buffer with specified clear color
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-        // Create a buffer for the square's positions.
-        const positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        const particlesMaterial = new THREE.PointsMaterial({
+            size: 0.1,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            opacity: 0.8
+        });
 
-        // Set up the positions for a square
-        const positions = [
-            -0.5, -0.5,
-             0.5, -0.5,
-            -0.5,  0.5,
-             0.5,  0.5,
-        ];
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        this.particles = new THREE.Points(particlesGeometry, particlesMaterial);
+        this.scene.add(this.particles);
+    }
 
-        // Create a vertex shader
-        const vertexShaderSource = `
-            attribute vec4 a_position;
-            void main() {
-                gl_Position = a_position;
+    addPostProcessing() {
+        this.composer = new EffectComposer(this.renderer);
+        
+        const renderPass = new RenderPass(this.scene, this.camera);
+        this.composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5,  // strength
+            0.4,  // radius
+            0.85  // threshold
+        );
+        this.composer.addPass(bloomPass);
+
+        const glitchPass = new GlitchPass();
+        glitchPass.goWild = false;
+        this.composer.addPass(glitchPass);
+    }
+
+    animate() {
+        requestAnimationFrame(this.animate.bind(this));
+
+        const time = performance.now() * 0.001;
+
+        // Rotate particles
+        if (this.particles) {
+            this.particles.rotation.x = time * 0.1;
+            this.particles.rotation.y = time * 0.15;
+        }
+
+        // Animate environment objects
+        this.scene.children.forEach(child => {
+            if (child.isMesh) {
+                child.rotation.x += 0.01;
+                child.rotation.y += 0.01;
+                child.position.y += Math.sin(time + child.position.x) * 0.01;
             }
-        `;
-        const vertexShader = this.createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        });
 
-        // Create a fragment shader
-        const fragmentShaderSource = `
-            precision mediump float;
-            void main() {
-                gl_FragColor = vec4(0, 1, 0, 1); // Green color
-            }
-        `;
-        const fragmentShader = this.createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-
-        // Link the two shaders into a program
-        const program = this.createProgram(gl, vertexShader, fragmentShader);
-        gl.useProgram(program);
-
-        // Look up where the vertex data needs to go.
-        const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
-
-        // Turn on the attribute
-        gl.enableVertexAttribArray(positionAttributeLocation);
-
-        // Bind the position buffer.
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-        // Tell the attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-        const size = 2;          // 2 components per iteration
-        const type = gl.FLOAT;   // the data is 32bit floats
-        const normalize = false; // don't normalize the data
-        const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-        const offset = 0;        // start at the beginning of the buffer
-        gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
-
-        // Draw the square
-        const primitiveType = gl.TRIANGLE_STRIP;
-        const count = 4;
-        gl.drawArrays(primitiveType, offset, count);
+        this.composer.render();
     }
 
-    createShader(gl, type, source) {
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error(gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
-        }
-        return shader;
-    }
-
-    createProgram(gl, vertexShader, fragmentShader) {
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error(gl.getProgramInfoLog(program));
-            gl.deleteProgram(program);
-            return null;
-        }
-        return program;
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.composer.setSize(window.innerWidth, window.innerHeight);
     }
 }
 
